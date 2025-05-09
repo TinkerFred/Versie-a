@@ -81,7 +81,7 @@ const PUNTENTABEL_TEGENSPELERS: Record<string, number[]> = {
 
 export default function KleurenwiesApp() {
   const [players, setPlayers] = useState<string[]>([]);
-  const [inputNames, setInputNames] = useState(["", "", "", ""]);
+  const [inputNames, setInputNames] = useState<string[]>(["", "", "", ""]);
   const [rounds, setRounds] = useState<any[]>([]);
 
   const confirmNames = () => {
@@ -97,6 +97,7 @@ export default function KleurenwiesApp() {
         slagen: 0,
         gewonnen: {},
         punten: {},
+        dubbel: false,
       },
     ]);
   };
@@ -108,38 +109,44 @@ export default function KleurenwiesApp() {
     }
     newRounds[index][key] = value;
     const round = newRounds[index];
-    const { spel, slagen, spelers, gewonnen } = round;
+    const { spel, slagen, spelers, gewonnen, dubbel } = round;
+
+    const puntenPerSpeler: Record<string, number> = {};
 
     if (
       spel &&
       (key === "spel" ||
         key === "spelers" ||
         key === "slagen" ||
-        key === "gewonnen")
+        key === "gewonnen" ||
+        key === "dubbel")
     ) {
-      const puntenPerSpeler: Record<string, number> = {};
-
       if (SPELTYPE[spel] === "Normaal" && spelers.length > 0) {
         const i = Math.max(0, Math.min(slagen - 1, 12));
         const ps = PUNTENTABEL_SPELERS[spel]?.[i] ?? 0;
         const pt = PUNTENTABEL_TEGENSPELERS[spel]?.[i] ?? 0;
-        players.forEach(
-          (p) => (puntenPerSpeler[p] = spelers.includes(p) ? ps : pt)
-        );
+        players.forEach((p: string) => {
+          puntenPerSpeler[p] = spelers.includes(p) ? ps : pt;
+        });
       } else if (SPELTYPE[spel] === "Speciaal") {
-        players.forEach((p) => (puntenPerSpeler[p] = 0));
+        players.forEach((p: string) => (puntenPerSpeler[p] = 0));
         spelers.forEach((speler: string) => {
           const gewonnenSpel = gewonnen[speler];
           const basis = SPECIAAL_SPEL_PUNTEN[spel] ?? 0;
           const score = gewonnenSpel ? 3 * basis : -3 * basis;
           const tegenScore = -score / (players.length - 1);
-          players.forEach((p) => {
+          players.forEach((p: string) => {
             if (p === speler) {
               puntenPerSpeler[p] += score;
             } else {
               puntenPerSpeler[p] += tegenScore;
             }
           });
+        });
+      }
+      if (dubbel) {
+        Object.keys(puntenPerSpeler).forEach((p) => {
+          puntenPerSpeler[p] *= 2;
         });
       }
       newRounds[index].punten = puntenPerSpeler;
@@ -150,6 +157,7 @@ export default function KleurenwiesApp() {
 
   const totaal = (speler: string) =>
     rounds.reduce((acc, r) => acc + (r.punten?.[speler] || 0), 0);
+
   const isSoloSpel = (spel: string) => SOLO_SPELLEN.includes(spel);
 
   return (
@@ -161,6 +169,10 @@ export default function KleurenwiesApp() {
         color: "#333",
       }}
     >
+      <h1 style={{ textAlign: "center", marginBottom: 30 }}>
+        WhistMaster 3000
+      </h1>
+
       {!players.length ? (
         <div>
           <h2>Geef 4 spelers op</h2>
@@ -212,7 +224,7 @@ export default function KleurenwiesApp() {
             <thead style={{ backgroundColor: "#eaeaea" }}>
               <tr>
                 <th>#</th>
-                <th>Spel</th>
+                <th style={{ width: "1%", whiteSpace: "nowrap" }}>Spel</th>
                 <th>Spelers</th>
                 <th>Slagen / Gewonnen</th>
                 {players.map((p) => (
@@ -228,19 +240,25 @@ export default function KleurenwiesApp() {
                     <select
                       value={r.spel}
                       onChange={(e) => updateRound(i, "spel", e.target.value)}
-                      style={{
-                        padding: 4,
-                        maxWidth: 140,
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                      }}
+                      style={{ padding: 4, maxWidth: 120 }}
                     >
                       <option value="">--</option>
                       {Object.keys(SPELTYPE).map((s) => (
                         <option key={s}>{s}</option>
                       ))}
                     </select>
+                    <div>
+                      <label style={{ fontSize: "0.8em" }}>
+                        <input
+                          type="checkbox"
+                          checked={r.dubbel}
+                          onChange={(e) =>
+                            updateRound(i, "dubbel", e.target.checked)
+                          }
+                        />{" "}
+                        dubbel
+                      </label>
+                    </div>
                   </td>
                   <td>
                     {players.map((p) => (
